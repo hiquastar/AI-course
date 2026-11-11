@@ -143,3 +143,6 @@ def normaliseAngle(direction):
     while direction<-math.pi: direction += 2*math.pi
     assert -math.pi<=direction<=math.pi, direction
     return direction
+
+def okrmsn ():
+    pass
