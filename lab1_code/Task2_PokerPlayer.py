@@ -14,11 +14,11 @@ def generate_2hands(nn_card=3):
     """
     Return two hands of cards, each hand consists of nn_card number of cards.
     Note that there shall be no duplicates.
-    
+
     Parameters
     ----------
     nn_card : int
-            Number of cards in each hand
+        Number of cards in each hand
 
     Returns
     -------
@@ -27,17 +27,17 @@ def generate_2hands(nn_card=3):
     """
     card_ranks = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A']
     card_suits = ['s', 'h', 'd', 'c']
-    
+
     my_deck = []
     for r in card_ranks:
         for s in card_suits:
             my_deck.append(r + s)
-            
+
     random.shuffle(my_deck)
-    
+
     p1_cards = my_deck[0 : nn_card]
     p2_cards = my_deck[nn_card : nn_card * 2]
-    
+
     return p1_cards, p2_cards
 
 # identify hand category using IF-THEN rule
@@ -47,34 +47,34 @@ def get_single_rank_value(rank_char):
 
 def identify_hand(hand_):
     extracted_ranks = [item[0] for item in hand_]
-    
+
     if extracted_ranks[0] == extracted_ranks[1] and extracted_ranks[1] == extracted_ranks[2]:
         return 'three_of_a_kind', get_single_rank_value(extracted_ranks[0])
-    
+
     for r_val in set(extracted_ranks):
         if extracted_ranks.count(r_val) == 2:
             return 'pair', get_single_rank_value(r_val)
-            
+
     top_val = 0
     for r_val in extracted_ranks:
         v = get_single_rank_value(r_val)
         if v > top_val:
             top_val = v
-            
+
     high_card_tuple = ('high_card', top_val)
     return high_card_tuple
 
 def analyse_hand(hand_):
     h_cat, h_str = identify_hand(hand_)
     final_score = 0
-    
+
     if h_cat == 'high_card':
         final_score = h_str
     elif h_cat == 'pair':
         final_score = 13 + h_str
     elif h_cat == 'three_of_a_kind':
         final_score = 26 + h_str
-        
+
     return final_score
 
 #########################
@@ -114,13 +114,30 @@ def strategy_reflex_agent(player_cards):
     else:
         return 5
 
-def get_bid_amount(agent_type, cards):
+# Simple memory agent that checks opponent's previous bid
+def strategy_memory_agent(player_cards, opp_last_bid):
+    category, _ = identify_hand(player_cards)
+    
+    if category == 'three_of_a_kind':
+        return 50
+    elif category == 'pair':
+        # If opponent bid high last time, play safer with a lower bid
+        if opp_last_bid is not None and opp_last_bid >= 30:
+            return 10
+        else:
+            return 35
+    else:
+        return 5
+
+def get_bid_amount(agent_type, cards, opp_last_bid=None):
     if agent_type == 'random':
         return strategy_random_agent()
     elif agent_type == 'fixed':
         return strategy_fixed_agent()
     elif agent_type == 'reflex':
         return strategy_reflex_agent(cards)
+    elif agent_type == 'memory':
+        return strategy_memory_agent(cards, opp_last_bid)
     return 0
 
 
@@ -128,30 +145,39 @@ def get_bid_amount(agent_type, cards):
 
 def run_experiment_trials(agent_a, agent_b, total_games=100, total_hands=50):
     difference_list = []
-    
+
     for game_idx in range(total_games):
         score_a = 0
         score_b = 0
-        
+
         for hand_idx in range(total_hands):
             c1, c2 = generate_2hands(3)
             pot_money = 0
             
+            # Keep track of last bids for agents with memory
+            last_bid_a = None
+            last_bid_b = None
+
             for turn in range(3):
-                bid1 = get_bid_amount(agent_a, c1)
-                bid2 = get_bid_amount(agent_b, c2)
+                bid1 = get_bid_amount(agent_a, c1, last_bid_b)
+                bid2 = get_bid_amount(agent_b, c2, last_bid_a)
+                
                 pot_money += (bid1 + bid2)
-            
+                
+                # Update last bids
+                last_bid_a = bid1
+                last_bid_b = bid2
+
             val_a = analyse_hand(c1)
             val_b = analyse_hand(c2)
-            
+
             if val_a > val_b:
                 score_a += pot_money
             elif val_b > val_a:
                 score_b += pot_money
-                
+
         difference_list.append(score_a - score_b)
-        
+
     mean_result = np.mean(difference_list)
     std_result = np.std(difference_list)
     return mean_result, std_result
@@ -173,4 +199,7 @@ print("Reflex vs Random -> Mean =", mean_2e1, "| Std Dev =", std_2e1)
 mean_2e2, std_2e2 = run_experiment_trials('reflex', 'fixed')
 print("Reflex vs Fixed  -> Mean =", mean_2e2, "| Std Dev =", std_2e2)
 
-
+# Bonus Task: Memory vs Reflex evaluation
+print("\nBonus Task (Memory vs Reflex):")
+mean_bonus, std_bonus = run_experiment_trials('memory', 'reflex')
+print("Memory vs Reflex -> Mean =", mean_bonus, "| Std Dev =", std_bonus)
