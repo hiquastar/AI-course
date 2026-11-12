@@ -65,14 +65,14 @@ def identify_hand(hand_):
     return high_card_tuple
 
 def analyse_hand(hand_):
-    h_cat, h_str = identify_hand(hand_)
+    h_category, h_str = identify_hand(hand_)
     final_score = 0
 
-    if h_cat == 'high_card':
+    if h_category == 'high_card':
         final_score = h_str
-    elif h_cat == 'pair':
+    elif h_category == 'pair':
         final_score = 13 + h_str
-    elif h_cat == 'three_of_a_kind':
+    elif h_category == 'three_of_a_kind':
         final_score = 26 + h_str
 
     return final_score
@@ -106,10 +106,10 @@ def strategy_fixed_agent():
     return 20
 
 def strategy_reflex_agent(player_cards):
-    cat, _ = identify_hand(player_cards)
-    if cat == 'three_of_a_kind':
+    category, _ = identify_hand(player_cards)
+    if category == 'three_of_a_kind':
         return 45
-    elif cat == 'pair':
+    elif category == 'pair':
         return 30
     else:
         return 5
