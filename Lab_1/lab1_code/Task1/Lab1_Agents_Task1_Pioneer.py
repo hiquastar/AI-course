@@ -11,12 +11,12 @@ import Lab1_Agents_Task1_World as World
 import random
 
 # choose the agent: "random", "fixed", "reflex" or "memory"
-AGENT = "reflex"
+AGENT = "memory"
 
-SPEED = 2.0         # forward wheel speed
-TURN_SPEED = 1.0   # wheel speed when turning on the spot
-WALL_DIST = 0.5     # a wall closer than this is "too close"
-DANGER_DIST = 0.2   # a wall closer than this: back up before turning
+SPEED = 3.0         # wheel speed when driving forward
+TURN_SPEED = 1.0    # wheel speed when turning on the spot
+WALL_DIST = 0.5     # m: wall closer than this -> turn away from it
+DANGER_DIST = 0.2   # m: wall closer than this -> back up
 
 
 
@@ -27,7 +27,7 @@ randomUntil = 0
 
 def random_agent(simulationTime, left, right, energy):
     global randomSpeed, randomUntil
-    # pick a new random action, and keep it for a random time (0.5 - 1.5 s)
+    # new random speeds every 0.5 - 1.5 s
     if simulationTime >= randomUntil:
         randomSpeed = dict(speedLeft=random.uniform(-SPEED, SPEED),
                            speedRight=random.uniform(-SPEED, SPEED))
@@ -36,7 +36,7 @@ def random_agent(simulationTime, left, right, energy):
 
 
 
-# --- 1b. Fixed agent: same sequence of actions, ignores sensor input --- 
+# --- 1b. Fixed agent: same sequence of actions, ignores sensor input ---
 
 # (duration in ms, wheel speeds)
 fixedSequence = [
@@ -47,7 +47,7 @@ fixedSequence = [
 ]
 
 def fixed_agent(simulationTime, left, right, energy):
-    # the action only depends on the time, so the sequence repeats forever
+    # only the time picks the action, and the list repeats
     cycleTime = sum(duration for duration, speed in fixedSequence)
     t = simulationTime % cycleTime
     for duration, speed in fixedSequence:
@@ -56,26 +56,25 @@ def fixed_agent(simulationTime, left, right, energy):
         t -= duration
 
 
-##################################################################
-# Helper: wall avoidance (used by the reflex and memory agents)  #
-# Only looks at the current sensor readings.                     #
-# Returns wheel speeds that move away from a wall,               #
-# or None when no wall is close (then another rule decides).     #
-##################################################################
+
+
+# --- Helper: avoid walls ---
+# Gives speeds that move away from a wall, or None if no wall is close.
+
 def avoid_walls(left, right):
-    # 1. wall very close -> back up, turning away from the closer side
+    # 1. too close: back up, away from the nearer wall
     if left < DANGER_DIST or right < DANGER_DIST:
-        if left < right:   # closer on the left -> back up, nose turns right
+        if left < right:   # nearer on the left -> turn right
             return dict(speedLeft=-0.5, speedRight=-TURN_SPEED)
-        else:              # closer on the right -> back up, nose turns left
+        else:              # nearer on the right -> turn left
             return dict(speedLeft=-TURN_SPEED, speedRight=-0.5)
-    # 2. wall in front (both sensors) -> turn on the spot towards the free side
+    # 2. wall ahead: turn on the spot to the side with more room
     if left < WALL_DIST and right < WALL_DIST:
-        if left > right:   # more space on the left -> turn left
+        if left > right:   # more room on the left
             return dict(speedLeft=-TURN_SPEED, speedRight=TURN_SPEED)
-        else:              # more space on the right -> turn right
+        else:              # more room on the right
             return dict(speedLeft=TURN_SPEED, speedRight=-TURN_SPEED)
-    # 3. wall on one side -> curve away from it
+    # 3. wall on one side: turn away from it
     if left < WALL_DIST:
         return dict(speedLeft=SPEED, speedRight=-0.5)   # turn right
     if right < WALL_DIST:
@@ -84,10 +83,11 @@ def avoid_walls(left, right):
     return None
 
 
-###############################################################
-# Helper: drive towards the nearest block                    #
-# energy.direction > 0: block is on the right                #
-###############################################################
+
+
+# --- Helper: drive to the nearest block ---
+# energy.direction > 0: block is on the right
+
 def go_to_block(energy):
     if energy.direction > 0.4:
         return dict(speedLeft=SPEED, speedRight=SPEED * 0.1)
@@ -101,71 +101,107 @@ def go_to_block(energy):
 
 
 
-# --- 1c. Reflex agent: only uses the current sensor readings ---    
-# first avoid walls, then drive towards the nearest block     
+
+# --- Helper: follow the wall on the left (memory agent) ---
+# Only the left sensor can see a wall at the side, so we keep the wall on the left.
+# wallLostFor: ms since the left sensor last saw the wall.
+
+FOLLOW_NEAR = 0.4   # m: wall closer than this -> steer away from it
+FOLLOW_FAR  = 0.7   # m: wall farther than this -> wall is lost
+CORNER_TIME = 1500  # ms: wall lost shorter than this -> a corner, turn left
+
+def follow_wall(left, right, wallLostFor):
+    # too close: back up
+    if left < DANGER_DIST or right < DANGER_DIST:
+        return avoid_walls(left, right)
+    # wall ahead: turn right, so the wall is on the left
+    if right < WALL_DIST:
+        return dict(speedLeft=TURN_SPEED, speedRight=-TURN_SPEED)
+    # too close to the wall: steer right
+    if left < FOLLOW_NEAR:
+        return dict(speedLeft=SPEED, speedRight=SPEED * 0.6)
+    # good distance: go straight
+    if left <= FOLLOW_FAR:
+        return dict(speedLeft=SPEED, speedRight=SPEED)
+    # wall just ended: turn left around the corner
+    if wallLostFor < CORNER_TIME:
+        return dict(speedLeft=SPEED * 0.5, speedRight=SPEED)
+    # no wall for a while: go straight until we find one
+    return dict(speedLeft=SPEED, speedRight=SPEED)
+
+
+
+# --- 1c. Reflex agent: uses only what it sees now ---
+# Avoid walls first, then drive to the nearest block.
 
 def reflex_agent(simulationTime, left, right, energy):
-    wallAction = avoid_walls(left, right)
-    if wallAction is not None:
-        return wallAction
+    avoidSpeed = avoid_walls(left, right)
+    if avoidSpeed is not None:
+        return avoidSpeed
     return go_to_block(energy)
 
 
 
-# --- 1d. Agent with memory ---                                           
-# Default strategy: the reflex agent. The agent remembers the       
-# closest distance it has reached to the block and when. If it has  
-# not come closer for TIMEOUT ms it is probably stuck, so it        
-# switches strategy: back up and turn, then drive forward a while,  
-# then go back to the default strategy (see Figure 2 in the lab).   
+# --- 1d. Agent with memory ---
+# Default strategy: act like the reflex agent.
+# Not closer to the block for TIMEOUT ms -> stuck -> follow the wall (Figure 2).
+# Go back when closer than ever before, or when wall following takes too long.
+# Stuck again on the same block -> follow the wall longer.
 
-TIMEOUT = 5000        # ms without getting closer -> stuck
-TURN_TIME = 1500      # ms backing up and turning
-WANDER_TIME = 2000    # ms driving forward after the turn
+TIMEOUT = 5000          # ms: not closer to the block for this long -> stuck
+FOLLOW_TIME = 8000      # ms: wall following time, x the number of times stuck
+MAX_STUCK_COUNT = 4     # so wall following is at most 32 s
+LEAVE_MARGIN = 0.1      # m: this much closer than before -> stop following
 
-memory = dict(collected=0,              # blocks collected, last time we checked
-              bestDistance=float('inf'),
-              lastProgressTime=0,
-              turnUntil=0,
-              escapeUntil=0,
-              turnDirection=1)          # 1 = right, -1 = left, changes every escape
+memory = dict(collected       = 0,             # blocks collected at the last check
+              closestDistance = float('inf'),  # closest we got to the block
+              lastCloserTime  = 0,             # when we last got closer to the block
+              mode            = "goToBlock",   # "goToBlock" or "followWall"
+              followEndTime   = 0,             # when to stop wall following
+              lastWallTime    = 0,             # when the left sensor last saw the wall
+              stuckCount      = 0)             # times stuck on this block
 
 def memory_agent(simulationTime, left, right, energy):
-    # a block was collected -> new target, forget the old distance
+    # new block collected: forget the old one
     if blocksCollected > memory["collected"]:
         memory["collected"] = blocksCollected
-        memory["bestDistance"] = float('inf')
-        memory["lastProgressTime"] = simulationTime
+        memory["closestDistance"] = float('inf')
+        memory["lastCloserTime"] = simulationTime
+        memory["mode"] = "goToBlock"
+        memory["stuckCount"] = 0
 
-    # remember when we last came closer to the block
-    if energy.distance < memory["bestDistance"] - 0.05:
-        memory["bestDistance"] = energy.distance
-        memory["lastProgressTime"] = simulationTime
+    # --- alternative strategy: follow the wall ---
+    if memory["mode"] == "followWall":
+        if energy.distance < memory["closestDistance"] - LEAVE_MARGIN:
+            print("Got around the wall, going to the block again")
+            memory["mode"] = "goToBlock"
+            memory["closestDistance"] = energy.distance
+            memory["lastCloserTime"] = simulationTime
+        elif simulationTime > memory["followEndTime"]:
+            print("Wall following took too long, going to the block again")
+            memory["mode"] = "goToBlock"
+            memory["lastCloserTime"] = simulationTime
+        else:
+            if left <= FOLLOW_FAR:      # wall is still there
+                memory["lastWallTime"] = simulationTime
+            wallLostFor = simulationTime - memory["lastWallTime"]
+            return follow_wall(left, right, wallLostFor)
 
-    # stuck for too long -> start the alternative strategy
-    if simulationTime >= memory["escapeUntil"] and \
-       simulationTime - memory["lastProgressTime"] > TIMEOUT:
-        print("Stuck, trying something else...")
-        memory["turnDirection"] *= -1
-        memory["turnUntil"] = simulationTime + TURN_TIME
-        memory["escapeUntil"] = simulationTime + TURN_TIME + WANDER_TIME
-        # start measuring progress again after the escape
-        memory["bestDistance"] = float('inf')
-        memory["lastProgressTime"] = memory["escapeUntil"]
+    # --- default strategy: like the reflex agent ---
+    # got closer: remember it
+    if energy.distance < memory["closestDistance"] - 0.05:
+        memory["closestDistance"] = energy.distance
+        memory["lastCloserTime"] = simulationTime
 
-    # alternative strategy, part 1: back up while turning
-    if simulationTime < memory["turnUntil"]:
-        d = memory["turnDirection"]
-        return dict(speedLeft=-SPEED * 0.5 + TURN_SPEED * d,
-                    speedRight=-SPEED * 0.5 - TURN_SPEED * d)
-    # alternative strategy, part 2: drive forward, but still avoid walls
-    if simulationTime < memory["escapeUntil"]:
-        wallAction = avoid_walls(left, right)
-        if wallAction is not None:
-            return wallAction
-        return dict(speedLeft=SPEED, speedRight=SPEED)
+    # not closer for too long: stuck, so follow the wall
+    if simulationTime - memory["lastCloserTime"] > TIMEOUT:
+        memory["stuckCount"] = min(memory["stuckCount"] + 1, MAX_STUCK_COUNT)
+        memory["followEndTime"] = simulationTime + FOLLOW_TIME * memory["stuckCount"]
+        memory["lastWallTime"] = simulationTime
+        memory["mode"] = "followWall"
+        print("Stuck", memory["stuckCount"], "time(s), following the wall on the left")
+        return follow_wall(left, right, 0)
 
-    # default strategy
     return reflex_agent(simulationTime, left, right, energy)
 
 
@@ -182,11 +218,10 @@ blocksCollected = 0
 robot = World.init()
 # print important parts of the robot
 print(sorted(robot.keys()))
+print("Agent:", AGENT)
 
 while robot: # main Control loop
-    #######################################################
-    # Perception Phase: Get information about environment #
-    #######################################################
+    # --- Perception Phase: Get information about environment ---
     simulationTime = World.getSimulationTime()
     left = World.getSensorReading("ultraSonicSensorLeft")
     right = World.getSensorReading("ultraSonicSensorRight")
@@ -197,24 +232,21 @@ while robot: # main Control loop
                'ultraSonicSensorLeft:',left,\
                "ultraSonicSensorRight:", right)
 
-    # collected blocks are moved far away (1000, 1000), so if the nearest
-    # block is that far away, all blocks have been collected
+    # collected blocks are moved to (1000, 1000),
+    # so a block this far away means all are collected
     if energy.distance > 100:
         print("All blocks collected!")
         World.STOP()
         break
 
-    ##############################################
-    # Reasoning: figure out which action to take #
-    ##############################################
+    # --- Reasoning: figure out which action to take ---
     motorSpeed = agent(simulationTime, left, right, energy)
 
-    ########################################
-    # Action Phase: Assign speed to wheels #
-    ########################################
+    # --- Action Phase: Assign speed to wheels ---
     # assign speed to the wheels
     World.setMotorSpeeds(motorSpeed)
-    # try to collect energy block (will fail if not within range)
-    if World.collectNearestBlock() == 'Energy collected :)':
+    # try to collect the block (works within 0.5 m).
+    # Only try when it is close, because each call is slow.
+    if energy.distance < 0.8 and World.collectNearestBlock() == 'Energy collected :)':
         blocksCollected += 1
         print("Energy collected! Blocks collected:", blocksCollected)
