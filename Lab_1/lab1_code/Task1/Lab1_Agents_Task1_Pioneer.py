@@ -9,6 +9,7 @@
 # should be a corresponding call to simxFinish at the end!
 import Lab1_Agents_Task1_World as World
 import random
+import math
 
 # choose the agent: "random", "fixed", "reflex" or "memory"
 AGENT = "memory"
@@ -206,6 +207,38 @@ def memory_agent(simulationTime, left, right, energy):
 
 
 
+# --- Performance measures (Q3) ---
+
+RUN_TIME = 300000
+path = []
+
+def save_position(simulationTime, motorSpeed):
+    if path and simulationTime - path[-1][0] < 200:
+        return
+    _, pos = World.vrep.simxGetObjectPosition(robot.clientID, robot.pioneerRobotHandle, -1,
+                                              World.vrep.simx_opmode_oneshot_wait)
+    path.append((simulationTime, pos[0], pos[1], motorSpeed['speedLeft'], motorSpeed['speedRight']))
+
+def count_crashes():
+    crashes = 0
+    wasStuck = False
+    for i in range(5, len(path)):
+        t0, x0, y0, _, _ = path[i - 5]
+        t, x, y, sl, sr = path[i]
+        realSpeed = math.hypot(x - x0, y - y0) / ((t - t0) / 1000)
+        wheelSpeed = abs(0.1 * (sl + sr) / 2)
+        stuck = sl * sr > 0 and wheelSpeed > 0.1 and realSpeed < 0.2 * wheelSpeed
+        if stuck and not wasStuck:
+            crashes += 1
+        wasStuck = stuck
+    return crashes
+
+def explored_area():
+    squares = {(math.floor(x / 0.5), math.floor(y / 0.5)) for _, x, y, _, _ in path}
+    return len(squares) * 0.25
+
+
+
 # --- Main ---
 
 
@@ -238,6 +271,10 @@ while robot: # main Control loop
         print("All blocks collected!")
         World.STOP()
         break
+    if simulationTime > RUN_TIME:
+        print("5 minutes are over")
+        World.STOP()
+        break
 
     # --- Reasoning: figure out which action to take ---
     motorSpeed = agent(simulationTime, left, right, energy)
@@ -245,8 +282,15 @@ while robot: # main Control loop
     # --- Action Phase: Assign speed to wheels ---
     # assign speed to the wheels
     World.setMotorSpeeds(motorSpeed)
+    save_position(simulationTime, motorSpeed)
     # try to collect the block (works within 0.5 m).
     # Only try when it is close, because each call is slow.
     if energy.distance < 0.8 and World.collectNearestBlock() == 'Energy collected :)':
         blocksCollected += 1
         print("Energy collected! Blocks collected:", blocksCollected)
+
+# --- Results for Table 1 (Q3) ---
+print("Agent:", AGENT)
+print("Measure 1, blocks collected:", blocksCollected)
+print("Measure 2, crashes:", count_crashes())
+print("Measure 3, area explored (m2):", explored_area())
