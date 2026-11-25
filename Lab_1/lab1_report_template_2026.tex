@@ -17,55 +17,100 @@
 \usepackage{graphicx}
 \usepackage{subcaption}
 \usepackage{tikz}
+\usepackage{float}
+\usepackage{tcolorbox}
 \usetikzlibrary{automata, positioning, arrows}
+
 %\setcounter{section}{-1}
 
 \title{Artificial Intelligence Laboratory 1: Agents \\ DT8042 HT22, Halmstad University}
-\author{Firstname Lastname,  \{firstname.lastname\}@hh.se, \{program you registered to\}}
+
+
+\author{Quang Hieu Tran \ hietrn21@student.hh.se \ Civilingenjör i datateknik
+  \and Ponny Joseph \ ponjos26@student.hh.se \ Embedded and intelligence system}
 \date{November 2026}
 
 \begin{document}
 
 \maketitle
-
 \section*{Introduction}
-
-The objective of this lab is to ...
 
 \begin{tcolorbox}
 \textbf{Q1}: What type of agents have you implemented in this lab, and in which two application domains?
 \end{tcolorbox}
 
-\section*{Task 1: Mobile robot exploration}
+The objective of this lab is to practice designing, programming and implementing intelligent agents in two application domain, a mobile robot that collects energy blocks and a simplified poker game that aims to win more games and money. 
 
-For tasks 1a - 1d...
+
+
+\section*{Task 1: Mobile robot exploration}
 
 \begin{tcolorbox}
 \textbf{Q2}: Briefly explain each agent you have implemented for the mobile robot exploration task. Using diagrams/plots if necessary.
 \end{tcolorbox}
 
+\subsection*{Random Agent}
+In this task, we implemented an agent that moves the robot around the maze at random. Every $0.5$ to $1.5$ seconds it picks a new random speed between $-3$ and $3$ for each wheel, so the robot drives forward, backward or turns in an unpredictable way. The agent does not use any sensors. It therefore cannot aim for blocks or avoid walls, and it only collects a block when it happens to drive past one.
+
+\subsection*{Fixed Agent}
+In this task, we controlled the robot with a fixed sequence of move that repeats every 9 seconds. The robot drives forward for 4 s, turn right for 1 s, drive forward for 3 s and turn left for 1 s. The agent only uses the time to know which move to do and it ignores all sensors. The idea behind this sequence is to cover a large part of the maze with long straight moves, while the right and left turns change the direction so the robot does not keep driving along the same line. Because it cannot see walls, it often pushes against them, and how many block it finds depend on where the blocks happen to be.
+
+\subsection*{Reflex Agent}
+In this task, we programmed the robot to react only to what its sensor shows at the current moment, without any memory. The agent follows a simple rule. Avoiding walls always comes first. If a sensor reads less than 0.2 m the robot backs up, and if a wall is closer than 0.5 m it turns away toward the side with more space. When nothing is close, it heads for the nearest energy block, using the direction from the energy sensor to turn sharply or gently until the block is in front. This strategy keeps the robot safe and lets it collect blocks quickly in open space. But its weak side shows when a wall stands between the robot and the block. Both sensors then see the wall, and the robot keeps turning left and right on the spot in front of it without getting closer to the block. Since it has no memory, it cannot tell that it has been stuck at the same place for a long time, so it never tries another way around the wall.
+
+
+\subsection*{Memory Agent}
+In this task, we build an agent that remember how its search for the current block is going, so it can notice when it is stuck. It remembers the closest distance it has reached to the block, the last time it got closer, and how many times it has been stuck on this block. The agent uses two strategies.
+
+\medskip
+The normal strategy is the same as the reflex agent, so the robot avoids walls and drives towards the nearest block. While doing this, the agent check whether it is getting closer, If it has not got closer for 5 seconds, it is probably blocked by a wall, and it switches to the alternative strategy. 
+
+\medskip
+In the alternative strategy, the robot stops aiming at the block and follows the wall on its left side. If the right sensor reads less than 0.5 m, the robot treats it as a wall in front and turns right on the spot. Otherwise it uses the left sensor to keep the wall at a good distance. It steers right when the left reading is below 0.4 m and drives straight when it is between 0.4 and 0.7 m. When the left reading goes above 0.7 m, the wall has ended, so the robot turns left around the corner for up to 1.5 s, and after that it drives straight until it finds a wall again. The robot goes back to the normal strategy as soon as it is clearly closer to the block than before, which means it has found a way around the wall, or when a time limit runs out. Each time the robot gets stuck on the same block, this time limit grows from 8 s up to 32 s, so it can get around larger walls. When a block is collected, the memory is cleared for the next block.
+
+
+
+
+
+
 \begin{tcolorbox}
 \textbf{Q3}: Propose two additional performance measures and compare the performance of all four agents implemented. 
 \end{tcolorbox}
 
+Measure 2 is the number of crashes, which shows how safely an agent drives. We count a crash each time the wheels drive the robot forward or backward but the robot hardly moves, which means it is pressing against a wall. Measure 3 is the area explored, which shows how much of the maze an agent can reach. We divide the floor into squares of 0.5 × 0.5 m and add up the area of every square the robot has passed through. Each agent ran twice for 5 minutes in real-time mode, with new random block positions in every run. Table \ref{tab:comparison_robot} shows the best of the two runs for each agent.
+
+
 
 \begin{table}[h]
-\vspace{1cm}
 \begin{center}
 \begin{tabular}{cccc}
 \toprule
- Agent & Measure 1 & Measure 2  & Measure 3 \\
- Types & \#blocks collected & ... & ... \\\midrule
-Random & e.g. 7 & ... & ...  \\
-Fixed & ... & ... & ... \\
-Reflex & ... & ... & ...  \\
-Memory & ... & ... & ...   \\
+    Agent & Measure 1 & Measure 2 & Measure 3 \\
+    Types & \#blocks collected (5 min) & \#crashes (5 min) & area explored (m$^2$) \\\midrule
+    Random & 1 & 29 & 4.25 \\
+    Fixed  & 3 & 44 & 4.75 \\
+    Reflex & 4 & 1  & 3.25 \\
+    Memory & 9 & 17 & 21.25 \\
 \bottomrule
 \end{tabular}
 \end{center}
 \caption{Performance comparison}
-\label{tab:comparison}
+\label{tab:comparison_robot}
 \end{table}
+
+
+\subsection*{Discussion of measure 1}
+
+The first column of Table~\ref{tab:comparison_robot} gives the number of energy blocks each agent collected in 5 minutes. With 9 blocks, the memory agent collected more than twice as many as any other agent, and it was the only one to reach half of the blocks, which took it 117 seconds. Second place went to the reflex agent with 4 blocks. All of them were collected within the first 30 seconds, though, and for the rest of the run the robot stayed at a wall between itself and the next block. The memory agent began the same way, because its normal strategy is the reflex agent. The difference came when it stopped getting closer to a block. At that point it switched to wall following, and it kept collecting new blocks, the last one at around 225 seconds. Neither the random agent nor the fixed agent uses the energy sensor, and they collected 1 and 3 blocks. One thing to keep in mind is that the block positions were random in every run, so the agents did not face the same block layout. Using the same positions for all agents would give a fairer comparison.
+
+\subsection*{Discussion of measure 2}
+
+Crashes were counted in the same 5-minute runs, and here the order of the agents changes. The reflex agent crashed only once. Its first rule turns the robot away from walls, and after the first 30 seconds it spent more than 90\% of the time turning on the spot about 0.35~m in front of a wall, without driving forward. Both of the agents that ignore the sensors crashed far more often, 44 times for the fixed agent and 29 times for the random agent. The fixed agent hit a wall again in each forward move of its sequence and spent about 160 seconds pressed against walls. The memory agent ended up in between with 17 crashes, 16 of which happened during wall following. Its crashes were short, adding up to about 18 seconds against walls over the whole run.
+
+\subsection*{Discussion of measure 3}
+
+The last measure looks at how much of the maze each agent reached. Here the memory agent stands out with 21.25~m$^2$, more than four times the area of any other agent. While following walls it drove around obstacles into other parts of the maze, and at its furthest point it was almost 7~m from where it started. The reflex agent covered the smallest area, only 3.25~m$^2$, since it stayed at the same wall after its first 30 seconds. The random agent reached 4.25~m$^2$ and never went further than 2.8~m from its start. The fixed agent did slightly better with 4.75~m$^2$, until it got stuck against a wall.
+
 
 \section*{Bonus tasks - Mobile Robot}
 
@@ -78,34 +123,61 @@ Memory & ... & ... & ...   \\
         \end{enumerate}
 \end{tcolorbox}
 
+
+\subsection*{Robot version}
+
+Our memory agent is described in Q2. It drives like the reflex agent, but it remembers when it last got closer to the block. When it makes no progress for 5 seconds, it follows the left wall until it gets closer or time limit runs out, and it follows the wall longer each time it gets stuck on the same block.
+
+\paragraph{Is the memory agent performing better? Why or why not?} Yes. In our best runs it collected 9 blocks in 5 minutes against 4 for the reflex agent, and it was the only agent that reached six blocks. The main reason is that the reflex agent cannot tell that it has been stuck at the same wall for a long time, so it keeps repeating the same moves. The memory agent remembers its progress, so it notices when it is stuck and changes strategy to find a way around the wall. It still has some weaknesses. It only uses two of the robot's sensors, and 16 of its 17 crashes happened during wall following. It also always follows the left wall, even when the block is on the right side, and it needs 5 seconds to notice that it is stuck.
+
+\paragraph{What could be done to improve it?}  Our agent only reads two of the robot's ultrasonic sensors, so reading more of them could make wall following safer. The agent could also choose the left or right wall depending on which side the block is. A larger improvement would be to build a map of visited places, so the robot avoids dead ends and can plan a path to the block instead of only reacting.
+
 \section*{Task 2: Poker game agent}
 
 \begin{tcolorbox}
 \textbf{Q4}: Explain agents implemented for the poker application (task 2a, 2b, 2e).
 \end{tcolorbox}
+\noindent In this poker game consist of three different agents to decide how much to bid (between \$0 and \$50) in each of the three rounds.These three agents are the Random agent, fixed agent, Reflex agent.
 
+ \begin{itemize}
+     \item \textbf{Random Agent (Task 2a):} This agent does not look at its own cards or pay attention to what the opponent is bidding. In every bidding round, it simply chooses a random integer between 0 and 50 using random.randint(0, 50)
+
+     \item \textbf{Fixed Agent (Task 2b): } Like the random agent fixed agent also does not check its cards or what the opponent is doing. It simply bids the same fixed amount of \$20 in every single round.
+
+
+     \item \textbf{Reflex Agent (Task 2e): }Unlike the first two, this agent check its current hand before placing a bid. Using the i \texttt{identify\_hand()} function, it looks at the category of its three cards. If it holds three of a kind, it bids high (\$45). If it holds a pair, it bids a medium amount (\$30) and if it only has a high card, it plays safely by bidding \$5.
+\end{itemize}
 
 \begin{tcolorbox}
 \textbf{Q5}: Analyse the result of the game with a random agent vs. a fixed agent. Which agent is better? Why?
 \end{tcolorbox}
+When played Random Agent against the Fixed Agent over 100 games (50 hands per game), the mean difference in winnings stayed close to zero across different runs(we got -71.90 ± 979.22, 68.99 ± 835.41 and -17.08 ± 850.33)  with a very high standard deviation.
+
+
+\vspace{0.3cm}
+Neither agent is better than the other. Since the cards are shuffled and chosen randomly, both players have the same chance of getting the stronger hand at the showdown. Also, neither agent checks its cards before bidding the fixed agent always bids \$20 per round(\$60 per hand), while the random agent bids an average of \$25 per round (\$75 per hand). Because both bid blindly and lose just as much on weak hands as they win on strong hands, their results balance out over many games.
+
 
 \begin{tcolorbox}
 \textbf{Q6}: Does the implemented reflex agent make better decisions based on the strength of its hand?
 \end{tcolorbox}
+Yes, the reflex agent makes much better decisions because it checks the strength of its hand before placing a bid. It bids high (\$45 for three of a kind and \$30 for a pair) when it has a strong hand and bids very low (\$5 for a high card) when its hand is weak.
+Because the random and fixed agents keep bidding high amounts even with weak hands, the reflex agent bids higher amounts when it has strong cards and loses less when its cards are weak resulting in a large positive difference in winnings.
+
 
 \begin{tcolorbox}
 \textbf{Q7}: To empirically back your analysis, provide the mean and standard deviation of the bankroll difference at the end of the game for 100 games (50-hands per game), compare all agents in the table below.
 \end{tcolorbox}
 
-\begin{table}[h]
+\begin{table}[H]
 \vspace{1cm}
 \begin{center}
 \begin{tabular}{cccc}
 \toprule
  Agent vs. & Random & Fixed  & Reflex \\ \midrule
-Random & 0 &  e.g. 10 ± 42 & ...   \\
-Fixed & & 0 & ... \\
-Reflex &  &  & 0 \\
+Random & 0 & $-17.08 \pm 850.33$ & $-464.27 \pm 748.36$ \\
+Fixed & $17.08 \pm 850.33$ & 0 & $-637.05 \pm 662.77$ \\
+Reflex & $464.27 \pm 748.36$ & $637.05 \pm 662.77$ & 0 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -117,21 +189,42 @@ Reflex &  &  & 0 \\
 \section*{Bonus tasks - Poker Game}
 
 \begin{tcolorbox}
-\textbf{Q8}: (Bonus) Explain the memory agent you have implemented. Have your poker agent with memory play against the agent in 2e (reflex agent).  
-        
+\textbf{Q8}: (Bonus) Explain the memory agent you have implemented. Have your poker agent with memory play against the agent in 2e (reflex agent).        
         \begin{enumerate}
             \item Is the memory agent performing better? why/ why not?
             \item what could be done to improve it?
         \end{enumerate}
 \end{tcolorbox}
 
+The memory agent uses both its current hand and the opponent's previous bid to make decisions. If it has three of a kind then it bids \$50 and if it has a high card then it bids \$5. When it holds a pair it checks what the opponent bid in the previous round. If opponent's last bid is \$30 or more it assumes the opponent also has a pair or three of a kind so it lowers its bid to \$10 to avoid losing too much. Otherwise it bids \$35.
+
+\paragraph{Is the memory agent performing better? Why or why not?} Yes, the memory agent performs better than the reflex agent, ending with a positive mean difference across all our runs (138.50 ± 488.54, 125.10 ± 575.53, and 140.70 ± 532.66) as it reduces the loss when the opponent has a pair or a three of a kind.Since the reflex agent always bids \$30 or \$45 with a pair or three of a kind, the memory agent sees that high bid after round 1. If the memory agent only has a pair, it drops its bet from \$35 to \$10 in the next two rounds so it loses less money if beaten, while still bidding \$35 when the reflex agent bids \$5.
+
+\paragraph{What could be done to improve it?} Right now, the memory agent only remembers the opponent's last bid from the current hand. I could improve it by saving the opponent's past bids across the whole game to learn their playing style and guess their cards better.I could also make it check the exact card values for example,bidding more on a pair of Aces than a pair of 2s,instead of treating all pairs the same way.
+
 \section*{Contributions}
 
 Please describe your individual contributions to the work.
 
+\vspace{1em}
+The individual contributions to Lab 1 were divided between us as follows:
+
+\begin{itemize}
+    \item \textbf{Task 1:} Hieu was responsible for Task 1. This included writing the four agents for the Pioneer robot, the shared function that keeps the robot away from walls, and the wall following strategy of the memory agent. Hieu also tested the agents in CoppeliaSim, ran the experiments behind Table \ref{tab:comparison_robot}, measured the number of blocks, crashes and area explored, and wrote the Task 1 part of this report.
+
+    
+    \item \textbf{Task 2:} Ponny Joseph was responsible for Task 2 which is simplified poker game, where i wrote the python code for the game setup including shuffling the deck, dealing three cards to each player, handling the three bidding rounds and checking who wins at the showdown. I also created the function to identify the hand types (high card, pair and three of a kind) and calculate their scores. After that I implemented the random, fixed, reflex and memory agents then ran the 100 game tests to get the mean and standard deviation values and wrote the analysis for this part of the report.
+\end{itemize}
+
 \section*{Conclusion}
 
-Add some reflections/conclusions about the lab.
+This lab let us build and compare agents of increasing complexity, from agents that act at random to agents that remember what happened before, both for a mobile robot in a maze (Task 1) and for a simple poker game (Task 2). Adding memory made the agents more complex and brought new problems to solve, such as deciding when the robot is stuck and how long it should follow a wall. These values had to be tuned by testing the robot in the simulator.
 
+\medskip
+In Task 1, the memory agent collected 9 blocks, explored 21.25~m$^2$ and was the only agent that reached half of the blocks. The reflex agent crashed only once, but it collected its 4 blocks in the first 30 seconds and then stayed at the same wall, while the random and fixed agents collected 1 and 3 blocks and crashed 29 and 44 times. These results come from only two 5-minute runs per agent with random block positions, and the crashes were estimated from the movement of the robot. The memory agent could be improved by reading more of the robot's ultrasonic sensors and by remembering which parts of the maze it has already visited.
+
+\medskip
+Doing Task 2 helped to understand how different agent designs behave in a card game like poker. From running 100 games it was clear that the random and fixed agents do not perform well because the random agent just picks bids randomly and the fixed agent always places the same fixed bid without checking its cards.
+The reflex agent performed much better because it checks its own hand strength first and then bids higher only when it has a good hand like a pair or three of a kind. Adding the memory to the agent made it even smarter since it could look at what the opponent bid in the previous round and lower its own bid to avoid big losses when the opponent bid high. This showed that using both current hand information and past bidding history makes an agent work much better.
 
 \end{document}

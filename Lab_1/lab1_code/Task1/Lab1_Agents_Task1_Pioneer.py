@@ -11,8 +11,6 @@ import Lab1_Agents_Task1_World as World
 import random
 import math
 
-# choose the agent: "random", "fixed", "reflex" or "memory"
-AGENT = "memory"
 
 SPEED = 3.0         # wheel speed when driving forward
 TURN_SPEED = 1.0    # wheel speed when turning on the spot
@@ -59,6 +57,7 @@ def fixed_agent(simulationTime, left, right, energy):
 
 
 
+
 # --- Helper: avoid walls ---
 # Gives speeds that move away from a wall, or None if no wall is close.
 
@@ -83,9 +82,6 @@ def avoid_walls(left, right):
     # 4. no wall close
     return None
 
-
-
-
 # --- Helper: drive to the nearest block ---
 # energy.direction > 0: block is on the right
 
@@ -99,8 +95,6 @@ def go_to_block(energy):
     if energy.direction < -0.1:
         return dict(speedLeft=SPEED * 0.6, speedRight=SPEED)
     return dict(speedLeft=SPEED, speedRight=SPEED)
-
-
 
 
 # --- Helper: follow the wall on the left (memory agent) ---
@@ -140,7 +134,6 @@ def reflex_agent(simulationTime, left, right, energy):
     if avoidSpeed is not None:
         return avoidSpeed
     return go_to_block(energy)
-
 
 
 # --- 1d. Agent with memory ---
@@ -215,7 +208,9 @@ path = []
 def save_position(simulationTime, motorSpeed):
     if path and simulationTime - path[-1][0] < 200:
         return
-    _, pos = World.vrep.simxGetObjectPosition(robot.clientID, robot.pioneerRobotHandle, -1,
+    _, pos = World.vrep.simxGetObjectPosition(robot.clientID, 
+                                              robot.pioneerRobotHandle, 
+                                              -1, 
                                               World.vrep.simx_opmode_oneshot_wait)
     path.append((simulationTime, pos[0], pos[1], motorSpeed['speedLeft'], motorSpeed['speedRight']))
 
@@ -241,7 +236,8 @@ def explored_area():
 
 # --- Main ---
 
-
+# choose the agent: "random", "fixed", "reflex" or "memory"
+AGENT = "memory"
 agents = dict(random=random_agent, fixed=fixed_agent,
               reflex=reflex_agent, memory=memory_agent)
 agent = agents[AGENT]
