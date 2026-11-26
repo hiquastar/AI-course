@@ -209,8 +209,7 @@ def save_position(simulationTime, motorSpeed):
     if path and simulationTime - path[-1][0] < 200:
         return
     _, pos = World.vrep.simxGetObjectPosition(robot.clientID, 
-                                              robot.pioneerRobotHandle, 
-                                              -1, 
+                                              robot.pioneerRobotHandle, -1, 
                                               World.vrep.simx_opmode_oneshot_wait)
     path.append((simulationTime, pos[0], pos[1], motorSpeed['speedLeft'], motorSpeed['speedRight']))
 
